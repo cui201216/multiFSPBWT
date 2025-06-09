@@ -1467,8 +1467,8 @@ void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index
         }
         else if (panelMultiSyllable[index_a][e_idx]==true && panelMultiSyllable[index_b][e_idx]==true)
         {
-            string s1 = panelMultiMaps[index_a].find(s_idx)->second;
-            string s2 = panelMultiMaps[index_b].find(s_idx)->second;
+            string s1 = panelMultiMaps[index_a].find(e_idx)->second;
+            string s2 = panelMultiMaps[index_b].find(e_idx)->second;
             int prefix_len=0;
             // 从头部比较
             for (int j = 0; j < B; ++j) {
