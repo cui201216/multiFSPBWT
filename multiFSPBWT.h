@@ -1396,14 +1396,22 @@ void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index
     if (s_idx == -1) {
         start = 0;
     } else {
-        unsigned long tz;
-        if (B == 64) {
-            tz = __builtin_ctzll(X[index_a][s_idx] ^ X[index_b][s_idx]);
-        } else if (B == 128) {
-            tz = ctz128_uint128(X[index_a][s_idx] ^ X[index_b][s_idx]);
+        if (panelMultiSyllable[index_a][s_idx]==false && panelMultiSyllable[index_b][s_idx]==false)
+        {
+            unsigned long tz;
+            if (B == 64) {
+                tz = __builtin_ctzll(X[index_a][s_idx] ^ X[index_b][s_idx]);
+            } else if (B == 128) {
+                tz = ctz128_uint128(X[index_a][s_idx] ^ X[index_b][s_idx]);
+            }
+            //start = (s_idx + 1) * B - tz + 1;
+            start = (s_idx + 1) * B - tz;
         }
-        //start = (s_idx + 1) * B - tz + 1;
-        start = (s_idx + 1) * B - tz;
+        else if (panelMultiSyllable[index_a][s_idx]==true && panelMultiSyllable[index_b][s_idx]==true)
+        {
+
+        }
+
     }
     if (e_idx == n) {
         end = N;
