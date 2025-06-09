@@ -84,6 +84,8 @@ struct multiFSPBWT {
 
     int outPanelLongMatchQuery(int L, string outPanelOutput_file, bool even);
 
+    bool inPanelSyllableMultiEqual(int index_a, int index_b, int k);
+
     void inPanelRefine(int L, int s_idx, int e_idx, int index_a, int index_b,
                        ofstream &out);
 
@@ -1358,6 +1360,35 @@ int multiFSPBWT<Syllable>::outPanelLongMatchQuery(int L, string outPanelOutput_f
 }
 
 template<class Syllable>
+bool multiFSPBWT<Syllable>::inPanelSyllableMultiEqual(int index_a, int index_b, int k)
+{
+    if (X[index_a][k]!=X[index_b][k])
+    {
+        return false;
+    }
+    if (panelMultiSyllable[index_a][k]==false && panelMultiSyllable[index_b][k]==false)
+    {
+        return true;
+    }
+    if (panelMultiSyllable[index_a][k]==false ^ panelMultiSyllable[index_b][k]==false)
+    {
+        return false;
+    }
+    else
+    {
+        if (panelMultiMaps[index_a].find(k)->second==panelMultiMaps[index_b].find(k)->second)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+template<class Syllable>
 void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index_a, int index_b,
                                         ofstream &out) {
 
@@ -1405,7 +1436,7 @@ void multiFSPBWT<Syllable>::inPanelIdentification(int L, int s_idx, int e_idx, i
     int head = s_idx + 1, tail;
     while (head < e_idx) {
         tail = head;
-        while (tail < e_idx && X[index_a][tail] == X[index_b][tail]) {
+        while (tail < e_idx &&  inPanelSyllableMultiEqual(index_a,index_b,tail) ) {
             tail++;
         }
         if (tail - head >= l) {
@@ -1413,7 +1444,7 @@ void multiFSPBWT<Syllable>::inPanelIdentification(int L, int s_idx, int e_idx, i
 
         }
         head = tail + 1;
-        while (head < e_idx && X[index_a][head] != X[index_b][head]) {
+        while (head < e_idx && !inPanelSyllableMultiEqual(index_a,index_b,head)) {
             head++;
         }
     }
