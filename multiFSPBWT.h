@@ -1409,26 +1409,109 @@ void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index
         }
         else if (panelMultiSyllable[index_a][s_idx]==true && panelMultiSyllable[index_b][s_idx]==true)
         {
-
+            string s1 = panelMultiMaps[index_a].find(s_idx)->second;
+            string s2 = panelMultiMaps[index_b].find(s_idx)->second;
+            int suffix_len=0;
+            // 从尾部比较
+            for (int j = B-1; j >= 0; --j) {
+                int bit_s1 = s1[j] - '0'; // s1第j位的值
+                int bit_s2 = s2[j] - '0'; // s2第j位的值
+                if (bit_s1 != bit_s2 || s1[j] < '0' || s1[j] > '1' || s2[j] < '0' || s2[j] > '1') {
+                    break; // 不同或非法字符，停止
+                }
+                ++suffix_len;
+            }
+            start = (s_idx + 1) * B - suffix_len;
+        }
+        else
+        {
+            Syllable num=0;
+            string s;
+            if (panelMultiSyllable[index_a][s_idx]==true)
+            {
+                s=panelMultiMaps[index_a].find(s_idx)->second;
+                num=X[index_b][s_idx];
+            }
+            else
+            {
+                s=panelMultiMaps[index_b].find(s_idx)->second;
+                num=X[index_a][s_idx];
+            }
+            int suffix_len=0;
+            // 从尾部比较（字符串第63位对应整型第0位）
+            for (int j = B-1; j >= 0; --j) {
+                int i = B-1 - j; // 整型位索引从0递增
+                int bit_num = (num >> i) & 1; // 提取整型第i位
+                int bit_str = s[j] - '0'; // 字符串第j位的值
+                if (bit_num != bit_str) {
+                    break; // 不同或非法字符，停止
+                }
+                ++suffix_len;
+            }
+            start = (s_idx + 1) * B - suffix_len;
         }
 
     }
     if (e_idx == n) {
         end = N;
     } else {
-        unsigned long tz = 0;
-        if (B == 64) {
-            tz = __builtin_clzll(X[index_a][e_idx] ^ X[index_b][e_idx]);
-        } else if (B == 128) {
-            tz = clz128_uint128(X[index_a][e_idx] ^ X[index_b][e_idx]);
+        if (panelMultiSyllable[index_a][e_idx]==false && panelMultiSyllable[index_b][e_idx]==false)
+        {
+            unsigned long tz = 0;
+            if (B == 64) {
+                tz = __builtin_clzll(X[index_a][e_idx] ^ X[index_b][e_idx]);
+            } else if (B == 128) {
+                tz = clz128_uint128(X[index_a][e_idx] ^ X[index_b][e_idx]);
+            }
+            end = e_idx * B + tz;
         }
-        end = e_idx * B + tz;
+        else if (panelMultiSyllable[index_a][e_idx]==true && panelMultiSyllable[index_b][e_idx]==true)
+        {
+            string s1 = panelMultiMaps[index_a].find(s_idx)->second;
+            string s2 = panelMultiMaps[index_b].find(s_idx)->second;
+            int prefix_len=0;
+            // 从头部比较
+            for (int j = 0; j < B; ++j) {
+                int bit_s1 = s1[j] - '0'; // s1第j位的值
+                int bit_s2 = s2[j] - '0'; // s2第j位的值
+                if (bit_s1 != bit_s2 || s1[j] < '0' || s1[j] > '1' || s2[j] < '0' || s2[j] > '1') {
+                    break; // 不同或非法字符，停止
+                }
+                ++prefix_len;
+            }
+            end = e_idx * B + prefix_len;
+        }
+        else
+        {
+            Syllable num=0;
+            string s;
+            if (panelMultiSyllable[index_a][e_idx]==true)
+            {
+                s=panelMultiMaps[index_a].find(e_idx)->second;
+                num=X[index_b][e_idx];
+            }
+            else
+            {
+                s=panelMultiMaps[index_b].find(e_idx)->second;
+                num=X[index_a][e_idx];
+            }
+            int prefix_len=0;
+            // 从头部比较（字符串第0位对应整型第63位）
+            for (int j = 0; j < B; ++j) {
+                int i = B-1 - j; // 整型位索引从63递减
+                int bit_num = (num >> i) & 1; // 提取整型第i位
+                int bit_str = s[j] - '0'; // 字符串第j位的值
+                if (bit_num != bit_str || s[j] < '0' || s[j] > '1') {
+                    break; // 不同或非法字符，停止
+                }
+                ++prefix_len;
+            }
+            end = e_idx * B + prefix_len;
+        }
     }
-
     if (end - start >= L) {
         out << IDs[index_a] << '\t' << IDs[index_b] << '\t' << start << '\t'
                 << end << '\t' << end - start << '\n';
-
         ++inPanelMatchNum;
         matchLen+=(end-start);
     }
