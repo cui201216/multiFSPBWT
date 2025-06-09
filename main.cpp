@@ -271,12 +271,12 @@ int main(int argc, char *argv[])
 	CRY.T = pow(2, F); // 计算T的值，即2的F次方
 	CRY.minSiteL = B * 2 - 1;
 	// 构造函数用于初始化B、F、T和minSiteL的值
-	string panel = "test";
+	string panel = "out";
 	int a = CRY.readMacsPanel(panel);
 	std::cout << "read panel file done: " << a << endl;
 	int b = CRY.makeFuzzyPanelGlobally();
 	std::cout << "make panel file done: " << b << endl;
-	int c = CRY.inPanelLongMatchQuery(180,"outFile");
+	int c = CRY.inPanelLongMatchQuery(1800,"outFile");
 	std::cout << "query done: " << c << endl;
 
 

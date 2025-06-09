@@ -403,6 +403,8 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
         getline(ss, token, '\t'); // Skip physLoc
         getline(ss, token, '\t'); // Skip other column
         getline(ss, token, '\t'); // Get haplotype data
+        int len = token.size();
+
         if (token.size() != M)
             return 6; // Error: Haplotype data length doesn't match M
 
@@ -461,22 +463,22 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
     end = clock();
     readPanelTime = ((double)(end - start)) / CLOCKS_PER_SEC;
 
-    // Print X[][] bit information for debugging
-    cout << "M: " << M << " N: " << N << " n: " << n << endl;
-    cout << "IDs: ";
-    for (const auto& id : IDs) cout << id << " ";
-    cout << endl;
-    cout << "X[][] bits (all B bits, left to right):" << endl;
-    for (int i = 0; i < M; i++) {
-        cout << IDs[i] << ": ";
-        for (int k = 0; k < n; k++) {
-            for (int b = B - 1; b >= 0; b--) { // Print from high to low bit
-                cout << ((X[i][k] >> b) & 1);
-            }
-            cout << " ";
-        }
-        cout << endl;
-    }
+    // // Print X[][] bit information for debugging
+    // cout << "M: " << M << " N: " << N << " n: " << n << endl;
+    // cout << "IDs: ";
+    // for (const auto& id : IDs) cout << id << " ";
+    // cout << endl;
+    // cout << "X[][] bits (all B bits, left to right):" << endl;
+    // for (int i = 0; i < M; i++) {
+    //     cout << IDs[i] << ": ";
+    //     for (int k = 0; k < n; k++) {
+    //         for (int b = B - 1; b >= 0; b--) { // Print from high to low bit
+    //             cout << ((X[i][k] >> b) & 1);
+    //         }
+    //         cout << " ";
+    //     }
+    //     cout << endl;
+    // }
 
     return 0; // Success
 }
