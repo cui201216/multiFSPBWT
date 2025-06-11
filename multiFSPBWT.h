@@ -8,6 +8,7 @@
 #include <chrono>
 #include<iostream>
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <fstream>
 #include <numeric>
@@ -336,7 +337,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
         return 3; // Error: Invalid number of haplotypes (M < 1)
 
     // Step 2: Set up IDs
-    IDs.resize(M);
+   IDs.resize(M);
     for (int i = 0; i < M; i++)
     {
         IDs[i] = to_string(i); // One ID per haplotype
@@ -360,6 +361,10 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
         X.resize(M, vector<Syllable>(n));
         panelMultiSyllable.resize(M, std::vector<bool>(n, false));
         panelMultiMaps.resize(M);
+        // TODO 修改预分配数目
+        for (auto& map : panelMultiMaps) {
+            map.reserve(100); // 假设每个 map 最多存 10 个键值对
+        }
         array.resize(n + 1, vector<int>(M));
         iota(array[0].begin(), array[0].end(), 0);
         divergence.resize(n + 1, vector<int>(M, 0));
@@ -372,7 +377,11 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
     in.clear();
     in.seekg(0);
     vector<Syllable> X_(M, 0); // Temporary storage for current syllable
-    vector<std::string> temp_syllables(M, ""); // Temporary storage for syllable strings
+    // vector<std::string> temp_syllables(M, ""); // Temporary storage for syllable strings
+    // for (auto& s : temp_syllables) {
+    //     s.reserve(B); // 预分配 B 个字符
+    // }
+    std::vector<std::array<char, 129>> temp_syllables(M);
     int K = 0; // Site index
     int k = 0; // Syllable index
     while (getline(in, line))
@@ -388,9 +397,10 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
                 X[i][k - 1] = X_[i];
                 if (panelMultiSyllable[i][k - 1])
                 {
-                    panelMultiMaps[i][k - 1] = temp_syllables[i];
+                    temp_syllables[i][B] = '\0';
+                    panelMultiMaps[i][k - 1] = temp_syllables[i].data();
                 }
-                temp_syllables[i].clear();
+                std::fill(temp_syllables[i].begin(), temp_syllables[i].end(), 0);
             }
             X_.assign(M, 0);
         }
@@ -403,7 +413,6 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
         getline(ss, token, '\t'); // Skip physLoc
         getline(ss, token, '\t'); // Skip other column
         getline(ss, token, '\t'); // Get haplotype data
-        int len = token.size();
 
         if (token.size() != M)
             return 6; // Error: Haplotype data length doesn't match M
@@ -428,7 +437,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
                 return 7; // Error: Missing data (.) not supported
             else
                 return 8; // Error: Invalid character in haplotype data
-            temp_syllables[index] += c;
+            temp_syllables[index][K % B] = c;
             index++;
         }
         if (index != M)
@@ -442,14 +451,12 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
                 for (int i = 0; i < M; i++)
                 {
                     X_[i] <<= pad2;
-                    temp_syllables[i] += std::string(pad2, '0'); // Pad with '0'
-                }
-                for (int i = 0; i < M; i++)
-                {
+                    //temp_syllables[i] += std::string(pad2, '0'); // Pad with '0'
+                    std::fill_n(temp_syllables[i].begin() + (K % B), pad2, '0');
+                    temp_syllables[i][K % B + pad2] = '\0';
                     X[i][k] = X_[i];
-                    if (panelMultiSyllable[i][k])
-                    {
-                        panelMultiMaps[i][k] = temp_syllables[i];
+                    if (panelMultiSyllable[i][k]) {
+                        panelMultiMaps[i][k] = temp_syllables[i].data();
                     }
                 }
             }
