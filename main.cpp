@@ -314,82 +314,66 @@ void printMultiFSPBWTStats(const multiFSPBWT<unsigned long long>& cry) {
 	}
 }
 
-template<typename Syllable>
-void printMemoryUsage(const multiFSPBWT<Syllable>& instance) {
-    std::cout << "\n===== 内存占用统计 =====" << std::endl;
+template<class Syllable>
+void printMemoryUsage(const multiFSPBWT<Syllable>& CRY) {
+    size_t XSize = 0, panelMultiSyllableSize = 0, panelMultiMapsSize = 0, tempSyllablesSize = 0;
+    size_t arraySize = 0, divergenceSize = 0, uSize = 0, IDsSize = 0;
 
-    // 计算 X 的内存占用
-    size_t xSize = 0;
-    for (const auto& row : instance.X) {
-        xSize += row.capacity() * sizeof(Syllable);
+    // X: vector<vector<Syllable>>
+    for (const auto& row : CRY.X) {
+        XSize += sizeof(std::vector<Syllable>) + row.capacity() * sizeof(Syllable);
     }
-    std::cout << "X: " << xSize / (1024.0 * 1024.0) << " MB (" << xSize << " bytes)" << std::endl;
 
-    // 计算 fuzzyX 的内存占用
-    size_t fuzzyXSize = 0;
-    for (const auto& row : instance.fuzzyX) {
-        fuzzyXSize += row.capacity() * sizeof(uint32_t);
+    // panelMultiSyllable: vector<vector<bool>>
+    for (const auto& row : CRY.panelMultiSyllable) {
+        panelMultiSyllableSize += sizeof(std::vector<bool>) + row.capacity() / 8; // bool 按字节估算
     }
-    std::cout << "fuzzyX: " << fuzzyXSize / (1024.0 * 1024.0) << " MB (" << fuzzyXSize << " bytes)" << std::endl;
 
-    // 计算 array 的内存占用
-    size_t arraySize = 0;
-    for (const auto& row : instance.array) {
-        arraySize += row.capacity() * sizeof(int);
+    // panelMultiMaps: unordered_map<pair<int,int>, Uint4Array>
+    panelMultiMapsSize += sizeof(std::unordered_map<std::pair<int,int>, Uint4Array>) +
+                          CRY.panelMultiMaps.bucket_count() * sizeof(void*); // 桶开销
+    for (const auto& [key, arr] : CRY.panelMultiMaps) {
+        panelMultiMapsSize += sizeof(std::pair<const std::pair<int,int>, Uint4Array>) +
+                              arr.get_data().capacity() * sizeof(uint8_t);
     }
-    std::cout << "array: " << arraySize / (1024.0 * 1024.0) << " MB (" << arraySize << " bytes)" << std::endl;
 
-    // 计算 divergence 的内存占用
-    size_t divergenceSize = 0;
-    for (const auto& row : instance.divergence) {
-        divergenceSize += row.capacity() * sizeof(int);
+    // temp_syllables: vector<Uint4Array>
+    for (const auto& arr : CRY.temp_syllables) {
+        tempSyllablesSize += sizeof(Uint4Array) + arr.get_data().capacity() * sizeof(uint8_t);
     }
-    std::cout << "divergence: " << divergenceSize / (1024.0 * 1024.0) << " MB (" << divergenceSize << " bytes)" << std::endl;
 
-    // 计算 panelMultiSyllable 的内存占用
-    size_t panelMultiSyllableSize = 0;
-    for (const auto& row : instance.panelMultiSyllable) {
-        panelMultiSyllableSize += row.capacity() * sizeof(bool);
+    // array: vector<vector<int>>
+    for (const auto& row : CRY.array) {
+        arraySize += sizeof(std::vector<int>) + row.capacity() * sizeof(int);
     }
-    std::cout << "panelMultiSyllable: " << panelMultiSyllableSize / (1024.0 * 1024.0) << " MB (" << panelMultiSyllableSize << " bytes)" << std::endl;
 
-    // 计算 queryMultiSyllable 的内存占用
-    size_t queryMultiSyllableSize = 0;
-    for (const auto& row : instance.queryMultiSyllable) {
-        queryMultiSyllableSize += row.capacity() * sizeof(bool);
+    // divergence: vector<vector<int>>
+    for (const auto& row : CRY.divergence) {
+        divergenceSize += sizeof(std::vector<int>) + row.capacity() * sizeof(int);
     }
-    std::cout << "queryMultiSyllable: " << queryMultiSyllableSize / (1024.0 * 1024.0) << " MB (" << queryMultiSyllableSize << " bytes)" << std::endl;
 
-    // 计算 u 的内存占用
-    size_t uSize = instance.n * instance.M * instance.T * sizeof(int);
-    std::cout << "u: " << uSize / (1024.0 * 1024.0) << " MB (" << uSize << " bytes)" << std::endl;
+    // u: int*
+    uSize += CRY.n * CRY.M * CRY.T * sizeof(int);
 
-    // 计算 panelMultiMaps 的内存占用 (std::vector<std::vector<Uint4Array>>)
-    size_t panelMultiMapsSize = 0;
-    for (const auto& row : instance.panelMultiMaps) {
-        panelMultiMapsSize += sizeof(std::vector<Uint4Array>) + row.capacity() * sizeof(Uint4Array);
-        for (const auto& arr : row) {
-            panelMultiMapsSize += arr.get_data().capacity() * sizeof(uint8_t);
-        }
+    // IDs: vector<string>
+    for (const auto& id : CRY.IDs) {
+        IDsSize += sizeof(std::string) + id.capacity() * sizeof(char);
     }
-    std::cout << "panelMultiMaps: " << panelMultiMapsSize / (1024.0 * 1024.0) << " MB (" << panelMultiMapsSize << " bytes)" << std::endl;
 
-    // 计算 queryMultiMaps 的内存占用 (std::vector<std::unordered_map<int, std::string>>)
-    size_t queryMultiMapsSize = 0;
-    for (const auto& map : instance.queryMultiMaps) {
-        queryMultiMapsSize += map.size() * (sizeof(std::pair<int, std::string>) +
-                                           map.bucket_count() * sizeof(void*));
-        for (const auto& pair : map) {
-            queryMultiMapsSize += pair.second.capacity() * sizeof(char);
-        }
-    }
-    std::cout << "queryMultiMaps: " << queryMultiMapsSize / (1024.0 * 1024.0) << " MB (" << queryMultiMapsSize << " bytes)" << std::endl;
+    size_t totalSize = XSize + panelMultiSyllableSize + panelMultiMapsSize + tempSyllablesSize +
+                       arraySize + divergenceSize + uSize + IDsSize;
 
-    // 计算总内存占用
-    size_t totalSize = xSize + fuzzyXSize + arraySize + divergenceSize +
-                       panelMultiSyllableSize + queryMultiSyllableSize +
-                       uSize + panelMultiMapsSize + queryMultiMapsSize;
-    std::cout << "总计: " << totalSize / (1024.0 * 1024.0) << " MB (" << totalSize << " bytes)" << std::endl;
+    std::cout << "Memory usage breakdown (bytes):\n"
+              << "X: " << XSize << "\n"
+              << "panelMultiSyllable: " << panelMultiSyllableSize << "\n"
+              << "panelMultiMaps: " << panelMultiMapsSize << "\n"
+              << "temp_syllables: " << tempSyllablesSize << "\n"
+              << "array: " << arraySize << "\n"
+              << "divergence: " << divergenceSize << "\n"
+              << "u: " << uSize << "\n"
+              << "IDs: " << IDsSize << "\n"
+              << "Total: " << totalSize << " bytes ("
+              << totalSize / (1024.0 * 1024.0) << " MB)" << std::endl;
 }
 int main(int argc, char *argv[])
 {

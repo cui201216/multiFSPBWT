@@ -20,10 +20,22 @@
 #include"tools.h"
 #include <unistd.h>
 #include <unordered_map>
+#include <utility>
 #define FF 4
 
 using namespace std;
-
+namespace std {
+    template<>
+    struct hash<std::pair<int, int>> {
+        size_t operator()(const std::pair<int, int>& p) const noexcept {
+            // 结合两个 int 的哈希值
+            size_t h1 = std::hash<int>{}(p.first);
+            size_t h2 = std::hash<int>{}(p.second);
+            // 简单组合哈希值（避免冲突）
+            return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+        }
+    };
+}
 #define FF 4
 using namespace std;
 template<typename Syllable>
@@ -68,11 +80,12 @@ struct multiFSPBWT {
     vector<vector<uint32_t> > fuzzyZ;
     vector<string> qIDs;
 
-    std::vector<std::vector<Uint4Array>> panelMultiMaps;
+    std::unordered_map<std::pair<int,int>, Uint4Array> panelMultiMaps;
     int panelMultiSyllableNum = 0;
     u_long panelCount[10]={0};
     std::vector<std::unordered_map<int, std::string>> queryMultiMaps;
 
+    multiFSPBWT() : M(0), n(0), B(0), T(0), N(0), panelMultiSyllableNum(0), u(nullptr) {}
 
     int readVCF(string panel_file);
 
@@ -375,7 +388,9 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
     try {
         X.resize(M, std::vector<Syllable>(n));
         panelMultiSyllable.resize(M, std::vector<bool>(n, false));
-        panelMultiMaps.resize(M, std::vector<Uint4Array>(n, Uint4Array(B)));
+        panelMultiMaps.clear(); // 清空 map
+        //TODO 预留空间
+        panelMultiMaps.reserve(1500000); // 预留空间，
         temp_syllables.resize(M, Uint4Array(B));
         array.resize(n + 1, std::vector<int>(M));
         std::iota(array[0].begin(), array[0].end(), 0);
@@ -411,7 +426,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
             for (int i = 0; i < M; i++) {
                 X[i][k - 1] = X_[i];
                 if (panelMultiSyllable[i][k - 1]) {
-                    panelMultiMaps[i][k - 1] = temp_syllables[i];
+                    panelMultiMaps[{i, k-1}] = temp_syllables[i];
                     panelMultiSyllableNum++;
                    // std::cerr << "存储音节: i=" << i << ", k=" << k - 1 << ", total=" << panelMultiSyllableNum << std::endl; // 改动7：记录多字符音节
                 }
@@ -490,7 +505,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
                     }
                     X[i][k] = X_[i];
                     if (panelMultiSyllable[i][k]) {
-                        panelMultiMaps[i][k] = temp_syllables[i];
+                        panelMultiMaps[{i, k}] = temp_syllables[i];
                         panelMultiSyllableNum++;
                         //std::cerr << "存储音节（末尾）: i=" << i << ", k=" << k << ", total=" << panelMultiSyllableNum << std::endl;
                     }
@@ -1402,8 +1417,12 @@ bool multiFSPBWT<Syllable>::inPanelSyllableMultiEqual(int index_a, int index_b, 
     if (panelMultiSyllable[index_a][k] != panelMultiSyllable[index_b][k]) {
         return false;
     }
-    // 两者都为 true，比较 Uint4Array
-    return panelMultiMaps[index_a][k].get_data() == panelMultiMaps[index_b][k].get_data();
+    auto key_a = std::make_pair(index_a, k);
+    auto key_b = std::make_pair(index_b, k);
+    if (panelMultiMaps.count(key_a) && panelMultiMaps.count(key_b)) {
+        return panelMultiMaps[key_a] == panelMultiMaps[key_b];
+    }
+    return false; // 或其他默认行为
 }
 
 template<class Syllable>
@@ -1422,36 +1441,47 @@ void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index
             }
             start = (s_idx + 1) * B - tz;
         } else if (panelMultiSyllable[index_a][s_idx] && panelMultiSyllable[index_b][s_idx]) {
-            const Uint4Array& s1 = panelMultiMaps[index_a][s_idx];
-            const Uint4Array& s2 = panelMultiMaps[index_b][s_idx];
-            int suffix_len = 0;
-            for (int j = B - 1; j >= 0; --j) {
-                int bit_s1 = s1.get(j);
-                int bit_s2 = s2.get(j);
-                if (bit_s1 != bit_s2 || bit_s1 > 1 || bit_s2 > 1) {
-                    break;
+            auto key_a = std::make_pair(index_a, s_idx);
+            auto key_b = std::make_pair(index_b, s_idx);
+            if (panelMultiMaps.count(key_a) && panelMultiMaps.count(key_b)) {
+                const Uint4Array& s1 = panelMultiMaps[key_a];
+                const Uint4Array& s2 = panelMultiMaps[key_b];
+                int suffix_len = 0;
+                for (int j = B - 1; j >= 0; --j) {
+                    int bit_s1 = s1.get(j);
+                    int bit_s2 = s2.get(j);
+                    if (bit_s1 != bit_s2 || bit_s1 > 1 || bit_s2 > 1) {
+                        break;
+                    }
+                    ++suffix_len;
                 }
-                ++suffix_len;
+                start = (s_idx + 1) * B - suffix_len;
+            } else {
+                start = (s_idx + 1) * B; // 键不存在，假设无匹配
             }
-            start = (s_idx + 1) * B - suffix_len;
         } else {
             Syllable num = 0;
-            const Uint4Array* s;
+            const Uint4Array* s = nullptr;
             int s_idx_owner = panelMultiSyllable[index_a][s_idx] ? index_a : index_b;
             int num_idx = panelMultiSyllable[index_a][s_idx] ? index_b : index_a;
-            s = &panelMultiMaps[s_idx_owner][s_idx];
-            num = X[num_idx][s_idx];
-            int suffix_len = 0;
-            for (int j = B - 1; j >= 0; --j) {
-                int i = B - 1 - j;
-                int bit_num = (num >> i) & 1;
-                int bit_str = s->get(j);
-                if (bit_num != bit_str || bit_str > 1) {
-                    break;
+            auto key_owner = std::make_pair(s_idx_owner, s_idx);
+            if (panelMultiMaps.count(key_owner)) {
+                s = &panelMultiMaps[key_owner];
+                num = X[num_idx][s_idx];
+                int suffix_len = 0;
+                for (int j = B - 1; j >= 0; --j) {
+                    int i = B - 1 - j;
+                    int bit_num = (num >> i) & 1;
+                    int bit_str = s->get(j);
+                    if (bit_num != bit_str || bit_str > 1) {
+                        break;
+                    }
+                    ++suffix_len;
                 }
-                ++suffix_len;
+                start = (s_idx + 1) * B - suffix_len;
+            } else {
+                start = (s_idx + 1) * B; // 键不存在，假设无匹配
             }
-            start = (s_idx + 1) * B - suffix_len;
         }
     }
 
@@ -1467,36 +1497,47 @@ void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index
             }
             end = e_idx * B + tz;
         } else if (panelMultiSyllable[index_a][e_idx] && panelMultiSyllable[index_b][e_idx]) {
-            const Uint4Array& s1 = panelMultiMaps[index_a][e_idx];
-            const Uint4Array& s2 = panelMultiMaps[index_b][e_idx];
-            int prefix_len = 0;
-            for (int j = 0; j < B; ++j) {
-                int bit_s1 = s1.get(j);
-                int bit_s2 = s2.get(j);
-                if (bit_s1 != bit_s2 || bit_s1 > 1 || bit_s2 > 1) {
-                    break;
+            auto key_a = std::make_pair(index_a, e_idx);
+            auto key_b = std::make_pair(index_b, e_idx);
+            if (panelMultiMaps.count(key_a) && panelMultiMaps.count(key_b)) {
+                const Uint4Array& s1 = panelMultiMaps[key_a];
+                const Uint4Array& s2 = panelMultiMaps[key_b];
+                int prefix_len = 0;
+                for (int j = 0; j < B; ++j) {
+                    int bit_s1 = s1.get(j);
+                    int bit_s2 = s2.get(j);
+                    if (bit_s1 != bit_s2 || bit_s1 > 1 || bit_s2 > 1) {
+                        break;
+                    }
+                    ++prefix_len;
                 }
-                ++prefix_len;
+                end = e_idx * B + prefix_len;
+            } else {
+                end = e_idx * B; // 键不存在，假设无匹配
             }
-            end = e_idx * B + prefix_len;
         } else {
             Syllable num = 0;
-            const Uint4Array* s;
+            const Uint4Array* s = nullptr;
             int s_idx_owner = panelMultiSyllable[index_a][e_idx] ? index_a : index_b;
             int num_idx = panelMultiSyllable[index_a][e_idx] ? index_b : index_a;
-            s = &panelMultiMaps[s_idx_owner][e_idx];
-            num = X[num_idx][e_idx];
-            int prefix_len = 0;
-            for (int j = 0; j < B; ++j) {
-                int i = B - 1 - j;
-                int bit_num = (num >> i) & 1;
-                int bit_str = s->get(j);
-                if (bit_num != bit_str || bit_str > 1) {
-                    break;
+            auto key_owner = std::make_pair(s_idx_owner, e_idx);
+            if (panelMultiMaps.count(key_owner)) {
+                s = &panelMultiMaps[key_owner];
+                num = X[num_idx][e_idx];
+                int prefix_len = 0;
+                for (int j = 0; j < B; ++j) {
+                    int i = B - 1 - j;
+                    int bit_num = (num >> i) & 1;
+                    int bit_str = s->get(j);
+                    if (bit_num != bit_str || bit_str > 1) {
+                        break;
+                    }
+                    ++prefix_len;
                 }
-                ++prefix_len;
+                end = e_idx * B + prefix_len;
+            } else {
+                end = e_idx * B; // 键不存在，假设无匹配
             }
-            end = e_idx * B + prefix_len;
         }
     }
 
@@ -1507,6 +1548,7 @@ void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index
         matchLen += (end - start);
     }
 }
+
 template<class Syllable>
 void multiFSPBWT<Syllable>::inPanelIdentification(int L, int s_idx, int e_idx, int index_a,
                                                 int index_b, ofstream &out) {

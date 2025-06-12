@@ -189,6 +189,7 @@ size_t calculateSize(const std::vector<std::vector<T> > &vec) {
 // 辅助类：模拟 uint4_t 存取
 class Uint4Array {
 public:
+    Uint4Array() : data() {} // 默认构造函数，空向量
     Uint4Array(size_t size) : data((size + 1) / 2, 0) {} // Initialize with zeros
     void set(size_t index, uint8_t value) {
         if (value > 9) {
@@ -214,6 +215,10 @@ public:
         return is_high ? (data[byte_idx] >> 4) : (data[byte_idx] & 0x0F);
     }
     const std::vector<uint8_t>& get_data() const { return data; }
+    // 新增 == 运算符
+    bool operator==(const Uint4Array& other) const {
+        return data == other.data;
+    }
 private:
     std::vector<uint8_t> data;
 };
