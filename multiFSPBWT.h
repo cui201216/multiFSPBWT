@@ -68,6 +68,8 @@ struct multiFSPBWT {
     vector<string> qIDs;
 
     std::vector<std::unordered_map<int, std::string>> panelMultiMaps;
+    int panelMultiSyllableNum = 0;
+    u_long panelCount[10]={0};
     std::vector<std::unordered_map<int, std::string>> queryMultiMaps;
 
 
@@ -399,6 +401,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
                 {
                     temp_syllables[i][B] = '\0';
                     panelMultiMaps[i][k - 1] = temp_syllables[i].data();
+                    panelMultiSyllableNum += 1;
                 }
                 std::fill(temp_syllables[i].begin(), temp_syllables[i].end(), 0);
             }
@@ -439,6 +442,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
                 return 8; // Error: Invalid character in haplotype data
             temp_syllables[index][K % B] = c;
             index++;
+            panelCount[c-'0']+=1;
         }
         if (index != M)
             return 9; // Error: Processed haplotype count doesn't match M
@@ -457,6 +461,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
                     X[i][k] = X_[i];
                     if (panelMultiSyllable[i][k]) {
                         panelMultiMaps[i][k] = temp_syllables[i].data();
+                        panelMultiSyllableNum += 1;
                     }
                 }
             }

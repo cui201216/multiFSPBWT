@@ -262,6 +262,136 @@ int main(int argc, char *argv[])
 
 
 */
+
+void printMultiFSPBWTStats(const multiFSPBWT<unsigned long long>& cry) {
+    // 输出基本配置参数
+    std::cout << "===== 配置参数 =====" << std::endl;
+    std::cout << "B: " << cry.B << std::endl;
+    std::cout << "F: " << cry.F << std::endl;
+    std::cout << "T: " << cry.T << std::endl;
+    std::cout << "M: " << cry.M << std::endl;
+    std::cout << "N: " << cry.N << std::endl;
+    std::cout << "n: " << cry.n << std::endl;
+    std::cout << "minSiteL: " << cry.minSiteL << std::endl;
+
+    // 输出时间统计
+    std::cout << "\n===== 时间统计(秒) =====" << std::endl;
+    std::cout << "readPanelTime: " << cry.readPanelTime << std::endl;
+    std::cout << "makeFuzzyPanelTime: " << cry.makeFuzzyPanelTime << std::endl;
+    std::cout << "inPanelQueryTime: " << cry.inPanelQueryTime << std::endl;
+    std::cout << "inPanelFilteringTime: " << cry.inPanelFilteringTime << std::endl;
+    std::cout << "inPanelIdentificationTime: " << cry.inPanelIdentificationTime << std::endl;
+    std::cout << "readQueryTime: " << cry.readQueryTime << std::endl;
+    std::cout << "outPanelQueryTime: " << cry.outPanelQueryTime << std::endl;
+    std::cout << "outPanelFilteringTime: " << cry.outPanelFilteringTime << std::endl;
+    std::cout << "outPanelIdentificationTime: " << cry.outPanelIdentificationTime << std::endl;
+
+    // 输出计数统计
+    std::cout << "\n===== 计数统计 =====" << std::endl;
+    std::cout << "inPanelAlternativeNum: " << cry.inPanelAlternativeNum << std::endl;
+    std::cout << "inPanelMatchNum: " << cry.inPanelMatchNum << std::endl;
+    std::cout << "outPanelAlternativeNum: " << cry.outPanelAlternativeNum << std::endl;
+    std::cout << "outPanelMatchNum: " << cry.outPanelMatchNum << std::endl;
+    std::cout << "alternativeSyllableNum: " << cry.alternativeSyllableNum << std::endl;
+    std::cout << "matchLen: " << cry.matchLen << std::endl;
+    std::cout << "panelMultiSyllableNum: " << cry.panelMultiSyllableNum << std::endl;
+
+    // 计算并输出比率
+    std::cout << "\n===== 计算比率 =====" << std::endl;
+    long long product_M_n = static_cast<long long>(cry.M) * cry.n;
+    std::cout << "M * n: " << product_M_n << std::endl;
+
+    if (product_M_n > 0) {
+        double ratio = static_cast<double>(cry.panelMultiSyllableNum) / product_M_n;
+        std::cout << "panelMultiSyllableNum / (M * n): " << ratio << std::endl;
+    } else {
+        std::cout << "panelMultiSyllableNum / (M * n): 无法计算 (M*n为0)" << std::endl;
+    }
+	// 输出 panelCount 数组
+	std::cout << "\n===== Panel Count 统计 =====" << std::endl;
+	for (int i = 0; i < 10; ++i) {
+		std::cout << i << "的数量: " << cry.panelCount[i] << std::endl;
+	}
+}
+template<typename Syllable>
+void printMemoryUsage(const multiFSPBWT<Syllable>& instance) {
+    std::cout << "\n===== 内存占用统计 =====" << std::endl;
+
+    // 计算 X 的内存占用
+    size_t xSize = 0;
+    for (const auto& row : instance.X) {
+        xSize += row.capacity() * sizeof(Syllable);
+    }
+    std::cout << "X: " << xSize / (1024.0 * 1024.0) << " MB (" << xSize << " bytes)" << std::endl;
+
+    // 计算 fuzzyX 的内存占用
+    size_t fuzzyXSize = 0;
+    for (const auto& row : instance.fuzzyX) {
+        fuzzyXSize += row.capacity() * sizeof(uint32_t);
+    }
+    std::cout << "fuzzyX: " << fuzzyXSize / (1024.0 * 1024.0) << " MB (" << fuzzyXSize << " bytes)" << std::endl;
+
+    // 计算 array 的内存占用
+    size_t arraySize = 0;
+    for (const auto& row : instance.array) {
+        arraySize += row.capacity() * sizeof(int);
+    }
+    std::cout << "array: " << arraySize / (1024.0 * 1024.0) << " MB (" << arraySize << " bytes)" << std::endl;
+
+    // 计算 divergence 的内存占用
+    size_t divergenceSize = 0;
+    for (const auto& row : instance.divergence) {
+        divergenceSize += row.capacity() * sizeof(int);
+    }
+    std::cout << "divergence: " << divergenceSize / (1024.0 * 1024.0) << " MB (" << divergenceSize << " bytes)" << std::endl;
+
+    // 计算 panelMultiSyllable 的内存占用
+    size_t panelMultiSyllableSize = 0;
+    for (const auto& row : instance.panelMultiSyllable) {
+        panelMultiSyllableSize += row.capacity() * sizeof(bool);
+    }
+    std::cout << "panelMultiSyllable: " << panelMultiSyllableSize / (1024.0 * 1024.0) << " MB (" << panelMultiSyllableSize << " bytes)" << std::endl;
+
+    // 计算 queryMultiSyllable 的内存占用
+    size_t queryMultiSyllableSize = 0;
+    for (const auto& row : instance.queryMultiSyllable) {
+        queryMultiSyllableSize += row.capacity() * sizeof(bool);
+    }
+    std::cout << "queryMultiSyllable: " << queryMultiSyllableSize / (1024.0 * 1024.0) << " MB (" << queryMultiSyllableSize << " bytes)" << std::endl;
+
+    // 计算 u 的内存占用 (假设 u 指向一个大小为 instance.n * instance.M 的数组)
+    size_t uSize = instance.n * instance.M * sizeof(int);
+    std::cout << "u: " << uSize / (1024.0 * 1024.0) << " MB (" << uSize << " bytes)" << std::endl;
+
+    // 计算 panelMultiMaps 的内存占用
+    size_t panelMultiMapsSize = 0;
+    for (const auto& map : instance.panelMultiMaps) {
+        panelMultiMapsSize += map.size() * (sizeof(std::pair<int, std::string>) +
+                                           map.bucket_count() * sizeof(void*));
+        for (const auto& pair : map) {
+            panelMultiMapsSize += pair.second.capacity();
+        }
+    }
+    std::cout << "panelMultiMaps: " << panelMultiMapsSize / (1024.0 * 1024.0) << " MB (" << panelMultiMapsSize << " bytes)" << std::endl;
+
+    // 计算 queryMultiMaps 的内存占用
+    size_t queryMultiMapsSize = 0;
+    for (const auto& map : instance.queryMultiMaps) {
+        queryMultiMapsSize += map.size() * (sizeof(std::pair<int, std::string>) +
+                                           map.bucket_count() * sizeof(void*));
+        for (const auto& pair : map) {
+            queryMultiMapsSize += pair.second.capacity();
+        }
+    }
+    std::cout << "queryMultiMaps: " << queryMultiMapsSize / (1024.0 * 1024.0) << " MB (" << queryMultiMapsSize << " bytes)" << std::endl;
+
+    // 计算总内存占用
+    size_t totalSize = xSize + fuzzyXSize + arraySize + divergenceSize +
+                       panelMultiSyllableSize + queryMultiSyllableSize +
+                       uSize + panelMultiMapsSize + queryMultiMapsSize;
+    std::cout << "总计: " << totalSize / (1024.0 * 1024.0) << " MB (" << totalSize << " bytes)" << std::endl;
+}
+
 int main(int argc, char *argv[])
 {
 	int B=64,F=1;
@@ -279,6 +409,7 @@ int main(int argc, char *argv[])
 	int c = CRY.inPanelLongMatchQuery(1800,"outFile");
 	std::cout << "query done: " << c << endl;
 
-
+	printMultiFSPBWTStats(CRY);
+	printMemoryUsage(CRY);
 	return 0;
 }
