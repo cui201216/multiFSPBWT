@@ -294,19 +294,13 @@ void printMultiFSPBWTStats(const multiFSPBWT<unsigned long long>& cry) {
     std::cout << "outPanelMatchNum: " << cry.outPanelMatchNum << std::endl;
     std::cout << "alternativeSyllableNum: " << cry.alternativeSyllableNum << std::endl;
     std::cout << "matchLen: " << cry.matchLen << std::endl;
-    std::cout << "panelMultiSyllableNum: " << cry.panelMultiSyllableNum << std::endl;
 
     // 计算并输出比率
     std::cout << "\n===== 计算比率 =====" << std::endl;
     long long product_M_n = static_cast<long long>(cry.M) * cry.n;
     std::cout << "M * n: " << product_M_n << std::endl;
 
-    if (product_M_n > 0) {
-        double ratio = static_cast<double>(cry.panelMultiSyllableNum) / product_M_n;
-        std::cout << "panelMultiSyllableNum / (M * n): " << ratio << std::endl;
-    } else {
-        std::cout << "panelMultiSyllableNum / (M * n): 无法计算 (M*n为0)" << std::endl;
-    }
+
 	// 输出 panelCount 数组
 	std::cout << "\n===== Panel Count 统计 =====" << std::endl;
 	for (int i = 0; i < 10; ++i) {
@@ -316,7 +310,7 @@ void printMultiFSPBWTStats(const multiFSPBWT<unsigned long long>& cry) {
 
 template<class Syllable>
 void printMemoryUsage(const multiFSPBWT<Syllable>& CRY) {
-    size_t XSize = 0, panelMultiSyllableSize = 0, panelMultiMapsSize = 0, tempSyllablesSize = 0;
+    size_t XSize = 0, panelMultiInfoSize = 0, globalMultiValuesSize = 0;
     size_t arraySize = 0, divergenceSize = 0, uSize = 0, IDsSize = 0;
 
     // X: vector<vector<Syllable>>
@@ -324,23 +318,15 @@ void printMemoryUsage(const multiFSPBWT<Syllable>& CRY) {
         XSize += sizeof(std::vector<Syllable>) + row.capacity() * sizeof(Syllable);
     }
 
-    // panelMultiSyllable: vector<vector<bool>>
-    for (const auto& row : CRY.panelMultiSyllable) {
-        panelMultiSyllableSize += sizeof(std::vector<bool>) + row.capacity() / 8; // bool 按字节估算
+    // panelMultiInfo: vector<vector<pair<unsigned int, uint8_t>>>
+    for (const auto& row : CRY.panelMultiInfo) {
+        panelMultiInfoSize += sizeof(std::vector<std::pair<unsigned int, uint8_t>>) +
+                              row.capacity() * sizeof(std::pair<unsigned int, uint8_t>);
     }
 
-    // panelMultiMaps: unordered_map<pair<int,int>, Uint4Array>
-    panelMultiMapsSize += sizeof(std::unordered_map<std::pair<int,int>, Uint4Array>) +
-                          CRY.panelMultiMaps.bucket_count() * sizeof(void*); // 桶开销
-    for (const auto& [key, arr] : CRY.panelMultiMaps) {
-        panelMultiMapsSize += sizeof(std::pair<const std::pair<int,int>, Uint4Array>) +
-                              arr.get_data().capacity() * sizeof(uint8_t);
-    }
-
-    // temp_syllables: vector<Uint4Array>
-    for (const auto& arr : CRY.temp_syllables) {
-        tempSyllablesSize += sizeof(Uint4Array) + arr.get_data().capacity() * sizeof(uint8_t);
-    }
+    // globalMultiValues: vector<pair<uint8_t, uint8_t>>
+    globalMultiValuesSize += sizeof(std::vector<std::pair<uint8_t, uint8_t>>) +
+                             CRY.globalMultiValues.capacity() * sizeof(std::pair<uint8_t, uint8_t>);
 
     // array: vector<vector<int>>
     for (const auto& row : CRY.array) {
@@ -360,14 +346,13 @@ void printMemoryUsage(const multiFSPBWT<Syllable>& CRY) {
         IDsSize += sizeof(std::string) + id.capacity() * sizeof(char);
     }
 
-    size_t totalSize = XSize + panelMultiSyllableSize + panelMultiMapsSize + tempSyllablesSize +
+    size_t totalSize = XSize + panelMultiInfoSize + globalMultiValuesSize +
                        arraySize + divergenceSize + uSize + IDsSize;
 
     std::cout << "Memory usage breakdown (bytes):\n"
               << "X: " << XSize << "\n"
-              << "panelMultiSyllable: " << panelMultiSyllableSize << "\n"
-              << "panelMultiMaps: " << panelMultiMapsSize << "\n"
-              << "temp_syllables: " << tempSyllablesSize << "\n"
+              << "panelMultiInfo: " << panelMultiInfoSize << "\n"
+              << "globalMultiValues: " << globalMultiValuesSize << "\n"
               << "array: " << arraySize << "\n"
               << "divergence: " << divergenceSize << "\n"
               << "u: " << uSize << "\n"
@@ -375,6 +360,7 @@ void printMemoryUsage(const multiFSPBWT<Syllable>& CRY) {
               << "Total: " << totalSize << " bytes ("
               << totalSize / (1024.0 * 1024.0) << " MB)" << std::endl;
 }
+
 int main(int argc, char *argv[])
 {
 	int B=64,F=1;
