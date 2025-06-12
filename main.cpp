@@ -313,6 +313,7 @@ void printMultiFSPBWTStats(const multiFSPBWT<unsigned long long>& cry) {
 		std::cout << i << "的数量: " << cry.panelCount[i] << std::endl;
 	}
 }
+
 template<typename Syllable>
 void printMemoryUsage(const multiFSPBWT<Syllable>& instance) {
     std::cout << "\n===== 内存占用统计 =====" << std::endl;
@@ -359,28 +360,27 @@ void printMemoryUsage(const multiFSPBWT<Syllable>& instance) {
     }
     std::cout << "queryMultiSyllable: " << queryMultiSyllableSize / (1024.0 * 1024.0) << " MB (" << queryMultiSyllableSize << " bytes)" << std::endl;
 
-    // 计算 u 的内存占用 (假设 u 指向一个大小为 instance.n * instance.M 的数组)
-    size_t uSize = instance.n * instance.M * sizeof(int);
+    // 计算 u 的内存占用
+    size_t uSize = instance.n * instance.M * instance.T * sizeof(int);
     std::cout << "u: " << uSize / (1024.0 * 1024.0) << " MB (" << uSize << " bytes)" << std::endl;
 
-    // 计算 panelMultiMaps 的内存占用
+    // 计算 panelMultiMaps 的内存占用 (std::vector<std::vector<Uint4Array>>)
     size_t panelMultiMapsSize = 0;
-    for (const auto& map : instance.panelMultiMaps) {
-        panelMultiMapsSize += map.size() * (sizeof(std::pair<int, std::string>) +
-                                           map.bucket_count() * sizeof(void*));
-        for (const auto& pair : map) {
-            panelMultiMapsSize += pair.second.capacity();
+    for (const auto& row : instance.panelMultiMaps) {
+        panelMultiMapsSize += sizeof(std::vector<Uint4Array>) + row.capacity() * sizeof(Uint4Array);
+        for (const auto& arr : row) {
+            panelMultiMapsSize += arr.get_data().capacity() * sizeof(uint8_t);
         }
     }
     std::cout << "panelMultiMaps: " << panelMultiMapsSize / (1024.0 * 1024.0) << " MB (" << panelMultiMapsSize << " bytes)" << std::endl;
 
-    // 计算 queryMultiMaps 的内存占用
+    // 计算 queryMultiMaps 的内存占用 (std::vector<std::unordered_map<int, std::string>>)
     size_t queryMultiMapsSize = 0;
     for (const auto& map : instance.queryMultiMaps) {
         queryMultiMapsSize += map.size() * (sizeof(std::pair<int, std::string>) +
                                            map.bucket_count() * sizeof(void*));
         for (const auto& pair : map) {
-            queryMultiMapsSize += pair.second.capacity();
+            queryMultiMapsSize += pair.second.capacity() * sizeof(char);
         }
     }
     std::cout << "queryMultiMaps: " << queryMultiMapsSize / (1024.0 * 1024.0) << " MB (" << queryMultiMapsSize << " bytes)" << std::endl;
@@ -391,7 +391,6 @@ void printMemoryUsage(const multiFSPBWT<Syllable>& instance) {
                        uSize + panelMultiMapsSize + queryMultiMapsSize;
     std::cout << "总计: " << totalSize / (1024.0 * 1024.0) << " MB (" << totalSize << " bytes)" << std::endl;
 }
-
 int main(int argc, char *argv[])
 {
 	int B=64,F=1;
@@ -408,7 +407,7 @@ int main(int argc, char *argv[])
 	std::cout << "make panel file done: " << b << endl;
 	int c = CRY.inPanelLongMatchQuery(1800,"outFile");
 	std::cout << "query done: " << c << endl;
-
+	//
 	printMultiFSPBWTStats(CRY);
 	printMemoryUsage(CRY);
 	return 0;

@@ -60,6 +60,7 @@ struct multiFSPBWT {
 
     vector<vector<bool>> panelMultiSyllable;
     vector<vector<bool>> queryMultiSyllable;
+    std::vector<Uint4Array> temp_syllables; // M，新增声明
     int *u;
 
     int Q = 0;
@@ -67,7 +68,7 @@ struct multiFSPBWT {
     vector<vector<uint32_t> > fuzzyZ;
     vector<string> qIDs;
 
-    std::vector<std::unordered_map<int, std::string>> panelMultiMaps;
+    std::vector<std::vector<Uint4Array>> panelMultiMaps;
     int panelMultiSyllableNum = 0;
     u_long panelCount[10]={0};
     std::vector<std::unordered_map<int, std::string>> queryMultiMaps;
@@ -307,161 +308,191 @@ int multiFSPBWT<Syllable>::readQueryVCF(string query_file) {
 }
 
 template<class Syllable>
-int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
-{
+int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
     clock_t start, end;
     start = clock();
-    ifstream in(panel_file);
-    if (in.fail())
-        return 1; // Error: Failed to open panel file
+    std::ifstream in(panel_file);
+    if (in.fail()) {
+        std::cerr << "无法打开文件: " << panel_file << std::endl; // 改动1：添加中文错误信息
+        return 1;
+    }
 
-    string line;
+    std::string line;
 
-    // Step 1: Count haplotypes (M) from the first SITE line
+    // Step 1: 计算单倍型数 (M)
     M = 0;
     bool found_site = false;
-    while (getline(in, line))
-    {
-        if (line.rfind("SITE:", 0) == 0) // Check if line starts with "SITE:"
-        {
+    while (std::getline(in, line)) {
+        if (line.rfind("SITE:", 0) == 0) {
             found_site = true;
-            stringstream ss(line);
-            string token;
-            // Skip to the last column (haplotype data)
-            while (getline(ss, token, '\t'));
-            M = token.size(); // Length of 01 string gives number of haplotypes
+            std::stringstream ss(line);
+            std::string token;
+            std::vector<std::string> tokens;
+            while (std::getline(ss, token, '\t')) {
+                tokens.push_back(token);
+            }
+            if (tokens.size() < 5) { // 改动2：严格检查格式
+                std::cerr << "SITE行格式错误: 需要至少5个字段，实际为 " << tokens.size() << std::endl;
+                return 2;
+            }
+            M = tokens[4].size();
             break;
         }
     }
-    if (!found_site)
-        return 2; // Error: No SITE line found in panel file
-    if (M < 1)
-        return 3; // Error: Invalid number of haplotypes (M < 1)
+    if (!found_site) {
+        std::cerr << "未找到SITE行" << std::endl;
+        return 2;
+    }
+    if (M < 1) {
+        std::cerr << "无效的M: " << M << std::endl;
+        return 3;
+    }
+    std::cerr << "M = " << M << std::endl; // 改动3：添加日志
 
-    // Step 2: Set up IDs
-   IDs.resize(M);
-    for (int i = 0; i < M; i++)
-    {
-        IDs[i] = to_string(i); // One ID per haplotype
+    // Step 2: 设置IDs
+    IDs.resize(M);
+    for (int i = 0; i < M; i++) {
+        IDs[i] = std::to_string(i);
     }
 
-    // Step 3: Count sites (N) by reading SITE lines
+    // Step 3: 计算位点数 (N)
     N = 0;
     in.clear();
     in.seekg(0);
-    while (getline(in, line))
-    {
-        if (line.rfind("SITE:", 0) == 0)
+    while (std::getline(in, line)) {
+        if (line.rfind("SITE:", 0) == 0) {
             N++;
-    }
-    if (N < 1)
-        return 4; // Error: No valid sites found in panel file
-    n = (N + B - 1) / B; // Number of syllables
-
-    // Step 4: Initialize data structures
-    try {
-        X.resize(M, vector<Syllable>(n));
-        panelMultiSyllable.resize(M, std::vector<bool>(n, false));
-        panelMultiMaps.resize(M);
-        // TODO 修改预分配数目
-        for (auto& map : panelMultiMaps) {
-            map.reserve(100); // 假设每个 map 最多存 10 个键值对
         }
-        array.resize(n + 1, vector<int>(M));
-        iota(array[0].begin(), array[0].end(), 0);
-        divergence.resize(n + 1, vector<int>(M, 0));
-        u = new int[(long)n*M*T];
-    } catch (const std::bad_alloc&) {
-        return 5; // Error: Memory allocation failed
+    }
+    if (N < 1) {
+        std::cerr << "无效的N: " << N << std::endl;
+        return 4;
+    }
+    n = (N + B - 1) / B;
+    std::cerr << "N = " << N << ", n = " << n << ", B = " << B << std::endl; // 改动4：记录n和B
+
+    // Step 4: 初始化数据结构
+    try {
+        X.resize(M, std::vector<Syllable>(n));
+        panelMultiSyllable.resize(M, std::vector<bool>(n, false));
+        panelMultiMaps.resize(M, std::vector<Uint4Array>(n, Uint4Array(B)));
+        temp_syllables.resize(M, Uint4Array(B));
+        array.resize(n + 1, std::vector<int>(M));
+        std::iota(array[0].begin(), array[0].end(), 0);
+        divergence.resize(n + 1, std::vector<int>(M, 0));
+        u = new int[(unsigned long)n * M * T];
+    } catch (const std::bad_alloc& e) {
+        std::cerr << "内存分配失败: " << e.what() << std::endl;
+        return -1; // 改动5：统一错误代码
     }
 
-    // Step 5: Read and process SITE lines
+    // Step 5: 处理SITE行
     in.clear();
     in.seekg(0);
-    vector<Syllable> X_(M, 0); // Temporary storage for current syllable
-    // vector<std::string> temp_syllables(M, ""); // Temporary storage for syllable strings
-    // for (auto& s : temp_syllables) {
-    //     s.reserve(B); // 预分配 B 个字符
-    // }
-    std::vector<std::array<char, 129>> temp_syllables(M);
-    int K = 0; // Site index
-    int k = 0; // Syllable index
-    while (getline(in, line))
-    {
-        if (line.rfind("SITE:", 0) != 0)
-            continue; // Skip non-SITE lines
+    std::vector<Syllable> X_(M, 0);
+
+    int K = 0, k = 0;
+    while (std::getline(in, line)) {
+        if (line.rfind("SITE:", 0) != 0) {
+            continue;
+        }
+
+        if (K >= N) { // 改动6：防止K超出N
+            std::cerr << "SITE行数过多: K=" << K << ", 预期N=" << N << std::endl;
+            return 10;
+        }
 
         k = K / B;
-        if (K % B == 0 && K != 0)
-        {
-            for (int i = 0; i < M; i++)
-            {
+        if (K % B == 0 && K != 0) {
+            if (k - 1 >= n) {
+                std::cerr << "无效的k: " << k - 1 << ", n=" << n << std::endl;
+                return 11;
+            }
+            for (int i = 0; i < M; i++) {
                 X[i][k - 1] = X_[i];
-                if (panelMultiSyllable[i][k - 1])
-                {
-                    temp_syllables[i][B] = '\0';
-                    panelMultiMaps[i][k - 1] = temp_syllables[i].data();
-                    panelMultiSyllableNum += 1;
+                if (panelMultiSyllable[i][k - 1]) {
+                    panelMultiMaps[i][k - 1] = temp_syllables[i];
+                    panelMultiSyllableNum++;
+                   // std::cerr << "存储音节: i=" << i << ", k=" << k - 1 << ", total=" << panelMultiSyllableNum << std::endl; // 改动7：记录多字符音节
                 }
-                std::fill(temp_syllables[i].begin(), temp_syllables[i].end(), 0);
+                temp_syllables[i] = Uint4Array(B);
             }
             X_.assign(M, 0);
         }
 
-        stringstream ss(line);
-        string token;
-        // Parse SITE line: SITE: <index> <physLoc> <other> <haplotypes>
-        getline(ss, token, '\t'); // Skip "SITE:"
-        getline(ss, token, '\t'); // Skip index
-        getline(ss, token, '\t'); // Skip physLoc
-        getline(ss, token, '\t'); // Skip other column
-        getline(ss, token, '\t'); // Get haplotype data
+        std::stringstream ss(line);
+        std::string token;
+        std::getline(ss, token, '\t'); // Skip "SITE:"
+        std::getline(ss, token, '\t'); // Skip index
+        std::getline(ss, token, '\t'); // Skip physLoc
+        std::getline(ss, token, '\t'); // Skip other column
+        std::getline(ss, token, '\t'); // Get haplotype data
 
-        if (token.size() != M)
-            return 6; // Error: Haplotype data length doesn't match M
+        if (token.size() != M) {
+            std::cerr << "单倍型数据长度不匹配: 预期 " << M << ", 实际 " << token.size() << ", K=" << K << std::endl;
+            return 6;
+        }
 
         int index = 0;
-        for (char c : token)
-        {
-            if (c == '0')
-            {
+        for (char c : token) {
+            if (index >= M) {
+                std::cerr << "索引越界: index=" << index << ", M=" << M << ", K=" << K << std::endl;
+                return 9;
+            }
+            if (K % B >= B) {
+                std::cerr << "无效的K % B: " << K % B << ", K=" << K << std::endl;
+                return 12;
+            }
+            if (c == '0') {
                 X_[index] = X_[index] << 1;
-            }
-            else if (c == '1')
-            {
+            } else if (c == '1') {
                 X_[index] = (X_[index] << 1) | 1;
-            }
-            else if (c > '1' && c <= '9')
-            {
+            } else if (c > '1' && c <= '9') {
                 X_[index] = (X_[index] << 1) | 1;
                 panelMultiSyllable[index][k] = true;
+            } else if (c == '.') {
+                std::cerr << "无效字符 '.' 在 K=" << K << ", index=" << index << std::endl;
+                return 7;
+            } else {
+                std::cerr << "无效字符 '" << c << "' 在 K=" << K << ", index=" << index << std::endl;
+                return 8;
             }
-            else if (c == '.')
-                return 7; // Error: Missing data (.) not supported
-            else
-                return 8; // Error: Invalid character in haplotype data
-            temp_syllables[index][K % B] = c;
+            try {
+                temp_syllables[index].set(K % B, c - '0'); // 改动8：捕获异常
+            } catch (const std::out_of_range& e) {
+                std::cerr << "设置temp_syllables失败: index=" << index << ", K=" << K << ", 错误: " << e.what() << std::endl;
+                return 13;
+            }
+            panelCount[c - '0'] += 1;
             index++;
-            panelCount[c-'0']+=1;
         }
-        if (index != M)
-            return 9; // Error: Processed haplotype count doesn't match M
+        if (index != M) {
+            std::cerr << "处理了 " << index << " 个单倍型，预期 " << M << ", K=" << K << std::endl;
+            return 9;
+        }
 
-        if (K == N - 1) // Last site, pad if necessary
-        {
-            if (K % B != 0)
-            {
+        if (K == N - 1) {
+            if (K % B != 0) {
                 int pad2 = n * B - N;
-                for (int i = 0; i < M; i++)
-                {
+                if (pad2 < 0) {
+                    std::cerr << "无效的填充长度: pad2=" << pad2 << std::endl;
+                    return 14;
+                }
+                for (int i = 0; i < M; i++) {
                     X_[i] <<= pad2;
-                    //temp_syllables[i] += std::string(pad2, '0'); // Pad with '0'
-                    std::fill_n(temp_syllables[i].begin() + (K % B), pad2, '0');
-                    temp_syllables[i][K % B + pad2] = '\0';
+                    for (int b = K % B; b < B; b++) {
+                        try {
+                            temp_syllables[i].set(b, 0);
+                        } catch (const std::out_of_range& e) {
+                            std::cerr << "填充失败: i=" << i << ", b=" << b << ", 错误: " << e.what() << std::endl;
+                            return 13;
+                        }
+                    }
                     X[i][k] = X_[i];
                     if (panelMultiSyllable[i][k]) {
-                        panelMultiMaps[i][k] = temp_syllables[i].data();
-                        panelMultiSyllableNum += 1;
+                        panelMultiMaps[i][k] = temp_syllables[i];
+                        panelMultiSyllableNum++;
+                        //std::cerr << "存储音节（末尾）: i=" << i << ", k=" << k << ", total=" << panelMultiSyllableNum << std::endl;
                     }
                 }
             }
@@ -469,31 +500,18 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file)
         K++;
     }
 
-    if (K != N)
-        return 10; // Error: Processed site count doesn't match N
+    if (K != N) {
+        std::cerr << "处理了 " << K << " 个位点，预期 " << N << std::endl;
+        return 10;
+    }
 
     end = clock();
     readPanelTime = ((double)(end - start)) / CLOCKS_PER_SEC;
+    std::cerr << "readPanelTime = " << readPanelTime << " 秒, panelMultiSyllableNum = " << panelMultiSyllableNum << std::endl; // 改动9：记录运行信息
 
-    // // Print X[][] bit information for debugging
-    // cout << "M: " << M << " N: " << N << " n: " << n << endl;
-    // cout << "IDs: ";
-    // for (const auto& id : IDs) cout << id << " ";
-    // cout << endl;
-    // cout << "X[][] bits (all B bits, left to right):" << endl;
-    // for (int i = 0; i < M; i++) {
-    //     cout << IDs[i] << ": ";
-    //     for (int k = 0; k < n; k++) {
-    //         for (int b = B - 1; b >= 0; b--) { // Print from high to low bit
-    //             cout << ((X[i][k] >> b) & 1);
-    //         }
-    //         cout << " ";
-    //     }
-    //     cout << endl;
-    // }
-
-    return 0; // Success
+    return 0;
 }
+
 template<class Syllable>
 int multiFSPBWT<Syllable>::makeFuzzyPanelEvenly() {
     //get fuzzyX
@@ -1374,103 +1392,73 @@ int multiFSPBWT<Syllable>::outPanelLongMatchQuery(int L, string outPanelOutput_f
 }
 
 template<class Syllable>
-bool multiFSPBWT<Syllable>::inPanelSyllableMultiEqual(int index_a, int index_b, int k)
-{
-    if (X[index_a][k]!=X[index_b][k])
-    {
+bool multiFSPBWT<Syllable>::inPanelSyllableMultiEqual(int index_a, int index_b, int k) {
+    if (X[index_a][k] != X[index_b][k]) {
         return false;
     }
-    if (panelMultiSyllable[index_a][k]==false && panelMultiSyllable[index_b][k]==false)
-    {
+    if (!panelMultiSyllable[index_a][k] && !panelMultiSyllable[index_b][k]) {
         return true;
     }
-    if (panelMultiSyllable[index_a][k]==false ^ panelMultiSyllable[index_b][k]==false)
-    {
+    if (panelMultiSyllable[index_a][k] != panelMultiSyllable[index_b][k]) {
         return false;
     }
-    else
-    {
-        if (panelMultiMaps[index_a].find(k)->second==panelMultiMaps[index_b].find(k)->second)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    return true;
+    // 两者都为 true，比较 Uint4Array
+    return panelMultiMaps[index_a][k].get_data() == panelMultiMaps[index_b][k].get_data();
 }
 
 template<class Syllable>
 void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index_a, int index_b,
-                                        ofstream &out) {
-
+                                          std::ofstream &out) {
     int start = 0, end = 0;
     if (s_idx == -1) {
         start = 0;
     } else {
-        if (panelMultiSyllable[index_a][s_idx]==false && panelMultiSyllable[index_b][s_idx]==false)
-        {
+        if (!panelMultiSyllable[index_a][s_idx] && !panelMultiSyllable[index_b][s_idx]) {
             unsigned long tz;
             if (B == 64) {
                 tz = __builtin_ctzll(X[index_a][s_idx] ^ X[index_b][s_idx]);
             } else if (B == 128) {
                 tz = ctz128_uint128(X[index_a][s_idx] ^ X[index_b][s_idx]);
             }
-            //start = (s_idx + 1) * B - tz + 1;
             start = (s_idx + 1) * B - tz;
-        }
-        else if (panelMultiSyllable[index_a][s_idx]==true && panelMultiSyllable[index_b][s_idx]==true)
-        {
-            string s1 = panelMultiMaps[index_a].find(s_idx)->second;
-            string s2 = panelMultiMaps[index_b].find(s_idx)->second;
-            int suffix_len=0;
-            // 从尾部比较
-            for (int j = B-1; j >= 0; --j) {
-                int bit_s1 = s1[j] - '0'; // s1第j位的值
-                int bit_s2 = s2[j] - '0'; // s2第j位的值
-                if (bit_s1 != bit_s2 || s1[j] < '0' || s1[j] > '1' || s2[j] < '0' || s2[j] > '1') {
-                    break; // 不同或非法字符，停止
+        } else if (panelMultiSyllable[index_a][s_idx] && panelMultiSyllable[index_b][s_idx]) {
+            const Uint4Array& s1 = panelMultiMaps[index_a][s_idx];
+            const Uint4Array& s2 = panelMultiMaps[index_b][s_idx];
+            int suffix_len = 0;
+            for (int j = B - 1; j >= 0; --j) {
+                int bit_s1 = s1.get(j);
+                int bit_s2 = s2.get(j);
+                if (bit_s1 != bit_s2 || bit_s1 > 1 || bit_s2 > 1) {
+                    break;
+                }
+                ++suffix_len;
+            }
+            start = (s_idx + 1) * B - suffix_len;
+        } else {
+            Syllable num = 0;
+            const Uint4Array* s;
+            int s_idx_owner = panelMultiSyllable[index_a][s_idx] ? index_a : index_b;
+            int num_idx = panelMultiSyllable[index_a][s_idx] ? index_b : index_a;
+            s = &panelMultiMaps[s_idx_owner][s_idx];
+            num = X[num_idx][s_idx];
+            int suffix_len = 0;
+            for (int j = B - 1; j >= 0; --j) {
+                int i = B - 1 - j;
+                int bit_num = (num >> i) & 1;
+                int bit_str = s->get(j);
+                if (bit_num != bit_str || bit_str > 1) {
+                    break;
                 }
                 ++suffix_len;
             }
             start = (s_idx + 1) * B - suffix_len;
         }
-        else
-        {
-            Syllable num=0;
-            string s;
-            if (panelMultiSyllable[index_a][s_idx]==true)
-            {
-                s=panelMultiMaps[index_a].find(s_idx)->second;
-                num=X[index_b][s_idx];
-            }
-            else
-            {
-                s=panelMultiMaps[index_b].find(s_idx)->second;
-                num=X[index_a][s_idx];
-            }
-            int suffix_len=0;
-            // 从尾部比较（字符串第63位对应整型第0位）
-            for (int j = B-1; j >= 0; --j) {
-                int i = B-1 - j; // 整型位索引从0递增
-                int bit_num = (num >> i) & 1; // 提取整型第i位
-                int bit_str = s[j] - '0'; // 字符串第j位的值
-                if (bit_num != bit_str) {
-                    break; // 不同或非法字符，停止
-                }
-                ++suffix_len;
-            }
-            start = (s_idx + 1) * B - suffix_len;
-        }
-
     }
+
     if (e_idx == n) {
         end = N;
     } else {
-        if (panelMultiSyllable[index_a][e_idx]==false && panelMultiSyllable[index_b][e_idx]==false)
-        {
+        if (!panelMultiSyllable[index_a][e_idx] && !panelMultiSyllable[index_b][e_idx]) {
             unsigned long tz = 0;
             if (B == 64) {
                 tz = __builtin_clzll(X[index_a][e_idx] ^ X[index_b][e_idx]);
@@ -1478,59 +1466,47 @@ void multiFSPBWT<Syllable>::inPanelRefine(int L, int s_idx, int e_idx, int index
                 tz = clz128_uint128(X[index_a][e_idx] ^ X[index_b][e_idx]);
             }
             end = e_idx * B + tz;
-        }
-        else if (panelMultiSyllable[index_a][e_idx]==true && panelMultiSyllable[index_b][e_idx]==true)
-        {
-            string s1 = panelMultiMaps[index_a].find(e_idx)->second;
-            string s2 = panelMultiMaps[index_b].find(e_idx)->second;
-            int prefix_len=0;
-            // 从头部比较
+        } else if (panelMultiSyllable[index_a][e_idx] && panelMultiSyllable[index_b][e_idx]) {
+            const Uint4Array& s1 = panelMultiMaps[index_a][e_idx];
+            const Uint4Array& s2 = panelMultiMaps[index_b][e_idx];
+            int prefix_len = 0;
             for (int j = 0; j < B; ++j) {
-                int bit_s1 = s1[j] - '0'; // s1第j位的值
-                int bit_s2 = s2[j] - '0'; // s2第j位的值
-                if (bit_s1 != bit_s2 || s1[j] < '0' || s1[j] > '1' || s2[j] < '0' || s2[j] > '1') {
-                    break; // 不同或非法字符，停止
+                int bit_s1 = s1.get(j);
+                int bit_s2 = s2.get(j);
+                if (bit_s1 != bit_s2 || bit_s1 > 1 || bit_s2 > 1) {
+                    break;
                 }
                 ++prefix_len;
             }
             end = e_idx * B + prefix_len;
-        }
-        else
-        {
-            Syllable num=0;
-            string s;
-            if (panelMultiSyllable[index_a][e_idx]==true)
-            {
-                s=panelMultiMaps[index_a].find(e_idx)->second;
-                num=X[index_b][e_idx];
-            }
-            else
-            {
-                s=panelMultiMaps[index_b].find(e_idx)->second;
-                num=X[index_a][e_idx];
-            }
-            int prefix_len=0;
-            // 从头部比较（字符串第0位对应整型第63位）
+        } else {
+            Syllable num = 0;
+            const Uint4Array* s;
+            int s_idx_owner = panelMultiSyllable[index_a][e_idx] ? index_a : index_b;
+            int num_idx = panelMultiSyllable[index_a][e_idx] ? index_b : index_a;
+            s = &panelMultiMaps[s_idx_owner][e_idx];
+            num = X[num_idx][e_idx];
+            int prefix_len = 0;
             for (int j = 0; j < B; ++j) {
-                int i = B-1 - j; // 整型位索引从63递减
-                int bit_num = (num >> i) & 1; // 提取整型第i位
-                int bit_str = s[j] - '0'; // 字符串第j位的值
-                if (bit_num != bit_str || s[j] < '0' || s[j] > '1') {
-                    break; // 不同或非法字符，停止
+                int i = B - 1 - j;
+                int bit_num = (num >> i) & 1;
+                int bit_str = s->get(j);
+                if (bit_num != bit_str || bit_str > 1) {
+                    break;
                 }
                 ++prefix_len;
             }
             end = e_idx * B + prefix_len;
         }
     }
+
     if (end - start >= L) {
         out << IDs[index_a] << '\t' << IDs[index_b] << '\t' << start << '\t'
-                << end << '\t' << end - start << '\n';
+            << end << '\t' << end - start << '\n';
         ++inPanelMatchNum;
-        matchLen+=(end-start);
+        matchLen += (end - start);
     }
 }
-
 template<class Syllable>
 void multiFSPBWT<Syllable>::inPanelIdentification(int L, int s_idx, int e_idx, int index_a,
                                                 int index_b, ofstream &out) {

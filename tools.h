@@ -186,7 +186,35 @@ size_t calculateSize(const std::vector<std::vector<T> > &vec) {
     return totalSize;
 }
 
-
-
-
+// 辅助类：模拟 uint4_t 存取
+class Uint4Array {
+public:
+    Uint4Array(size_t size) : data((size + 1) / 2, 0) {} // Initialize with zeros
+    void set(size_t index, uint8_t value) {
+        if (value > 9) {
+            throw std::out_of_range("Value must be 0-9");
+        }
+        size_t byte_idx = index / 2;
+        if (byte_idx >= data.size()) {
+            throw std::out_of_range("Byte index out of bounds: " + std::to_string(byte_idx));
+        }
+        bool is_high = (index % 2 == 0);
+        if (is_high) {
+            data[byte_idx] = (data[byte_idx] & 0x0F) | (value << 4); // 高 4 位
+        } else {
+            data[byte_idx] = (data[byte_idx] & 0xF0) | value; // 低 4 位
+        }
+    }
+    uint8_t get(size_t index) const {
+        size_t byte_idx = index / 2;
+        if (byte_idx >= data.size()) {
+            throw std::out_of_range("Byte index out of bounds: " + std::to_string(byte_idx));
+        }
+        bool is_high = (index % 2 == 0);
+        return is_high ? (data[byte_idx] >> 4) : (data[byte_idx] & 0x0F);
+    }
+    const std::vector<uint8_t>& get_data() const { return data; }
+private:
+    std::vector<uint8_t> data;
+};
 #endif //TOOLS_H
