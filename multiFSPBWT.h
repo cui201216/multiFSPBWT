@@ -419,7 +419,7 @@ int multiFSPBWT<Syllable>::readMacsQuery(string query_file) {
                 std::cerr << "无效的k: " << k << ", n=" << n << std::endl;
                 return 11;
             }
-            for (int i = 0; i < M; i++) {
+            for (int i = 0; i < Q; i++) {
                 Z[i][k] = Z_[i]; // 保存压缩音节
                 // 存储多字符位点
                 if (!syllableMultis[i].empty()) {
