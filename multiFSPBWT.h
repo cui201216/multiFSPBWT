@@ -98,7 +98,7 @@ struct multiFSPBWT {
 
     int inPanelLongMatchQuery(int L, string inPanelOutput_file);
 
-    int outPanelLongMatchQuery(int L, string outPanelOutput_file, bool even);
+    int outPanelLongMatchQuery(int L, string outPanelOutput_file);
 
     bool inPanelSyllableMultiEqual(int index_a, int index_b, int k);
 
@@ -875,7 +875,7 @@ int multiFSPBWT<Syllable>::inPanelLongMatchQuery(int L, string inPanelOutput_fil
 }
 
 template<class Syllable>
-int multiFSPBWT<Syllable>::outPanelLongMatchQuery(int L, string outPanelOutput_file, bool even) {
+int multiFSPBWT<Syllable>::outPanelLongMatchQuery(int L, string outPanelOutput_file) {
     clock_t start, end;
     start = clock();
 
@@ -884,34 +884,6 @@ int multiFSPBWT<Syllable>::outPanelLongMatchQuery(int L, string outPanelOutput_f
     } else {
         fuzzyZ.resize(Q, vector<uint32_t>(FF * n / 32));
     }
-
-    if (even == true) {
-        int len = 0;
-        int fuzzyIndex = 0;
-        for (int k = 0; k < n; k++) {
-            for (int t = 0; t < FF; t++) {
-                int s = 32 - t * (32 / FF) - 1;
-
-                for (int i = 0; i < Q; i++) {
-                    bool b = (((Z[i][k] >> s) & 1) != 0);
-                    fuzzyZ[i][fuzzyIndex] = ((fuzzyZ[i][fuzzyIndex] << 1)
-                                             | b);
-                    if (i == Q - 1) {
-                        len++;
-                    }
-                    if (len == 32) {
-                        fuzzyIndex++;
-                        len = 0;
-                    }
-                }
-            }
-        }
-        int pad1 = 32 - len;
-        for (int i = 0; i < Q; i++) {
-            fuzzyZ[i][fuzzyZ[0].size() - 1] =
-                    fuzzyZ[i][fuzzyZ[0].size() - 1] << pad1;
-        }
-    } else {
         int index = 0, count = 0;
         for (int k = 0; k < n; k++) {
             if (count == 32 / FF) {
@@ -935,7 +907,6 @@ int multiFSPBWT<Syllable>::outPanelLongMatchQuery(int L, string outPanelOutput_f
             fuzzyZ[i][fuzzyZ[0].size() - 1] =
                     fuzzyZ[i][fuzzyZ[0].size() - 1] << pad1;
         }
-    }
 
     if (L < minSiteL) {
         return 1;
