@@ -41,13 +41,13 @@ bool validateFiles(const std::string& inputFile, const std::string& outputFile, 
 }
 
 int main(int argc, char* argv[]) {
-    std::string panelFile = "out";    // 默认输入文件名
-    std::string outputFile;           // 输出文件动态生成
-    std::string queryFile;            // 面板文件（可选）
-    std::string queryMode = "in";     // 默认查询模式为面板内
+    std::string panelFile = "out.panel";    // 默认输入文件名
+    std::string outputFile = "outTEST";           // 输出文件动态生成
+    std::string queryFile= "out.query";            // 面板文件（可选）
+    std::string queryMode = "out";     // 默认查询模式为面板内
     int B = 64;                       // 默认 B 值
     int F = 1;                        // 默认 F 值
-    int queryLength = 1800;           // 默认查询长度
+    int queryLength = 1500;           // 默认查询长度
 
     // 解析命令行参数
     int opt;
@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) {
     else if (B==128)
     {
         // 执行程序逻辑
-        multiFSPBWT<const unsigned __int128> CRY;
+        multiFSPBWT<__uint128_t> CRY;
         CRY.F = F;
         CRY.B = B;
         CRY.T = pow(2, F);
