@@ -190,7 +190,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
     try {
         X.resize(M, std::vector<Syllable>(n));
         panelMultiInfo.resize(M, std::vector<std::pair<unsigned int, uint8_t>>(n, std::make_pair(-1, 0)));
-        panelMultiValues.reserve(100000); // 预分配，基于统计的1,668,657
+        panelMultiValues.reserve(M*n*0.05); // 预分配，基于统计的1,668,657
         array.resize(n + 1, std::vector<int>(M));
         std::iota(array[0].begin(), array[0].end(), 0);
         divergence.resize(n + 1, std::vector<int>(M, 0));
@@ -389,7 +389,7 @@ int multiFSPBWT<Syllable>::readMacsQuery(string query_file) {
     try {
         Z.resize(Q, std::vector<Syllable>(n));
         queryMultiInfo.resize(Q, std::vector<std::pair<unsigned int, uint8_t>>(n, std::make_pair(-1, 0)));
-        queryMultiValues.reserve(Q*n*0.01);
+        queryMultiValues.reserve(Q*n*0.05);
     } catch (const std::bad_alloc& e) {
         std::cerr << "内存分配失败: " << e.what() << std::endl;
         return -1;
