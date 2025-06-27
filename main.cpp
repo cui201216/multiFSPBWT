@@ -114,15 +114,15 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // 输出参数信息
-    std::cout << "参数:\n"
-              << "面板文件: " << panelFile << "\n"
-              << "输出: " << outputFile << "\n"
-              << "查询文件: " << (queryFile.empty() ? "未指定" : queryFile) << "\n"
-              << "查询模式: " << queryMode << "\n"
-              << "B: " << B << "\n"
-              << "F: " << F << "\n"
-              << "查询长度: " << queryLength << "\n";
+    // // 输出参数信息
+    // std::cout << "参数:\n"
+    //           << "面板文件: " << panelFile << "\n"
+    //           << "输出: " << outputFile << "\n"
+    //           << "查询文件: " << (queryFile.empty() ? "未指定" : queryFile) << "\n"
+    //           << "查询模式: " << queryMode << "\n"
+    //           << "B: " << B << "\n"
+    //           << "F: " << F << "\n"
+    //           << "查询长度: " << queryLength << "\n";
 
     if (B==64)
     {
@@ -150,7 +150,10 @@ int main(int argc, char* argv[]) {
             std::cout << "<读取查询完成>: " << w << "\n";
             c = CRY.outPanelLongMatchQuery(queryLength, outputFile);
             std::cout << "面板外查询完成: " << c << "\n";
+
         }
+        string inf = panelFile +""+"_b"+ to_string(B)+"_f"+ to_string(F)+"_l"+ to_string(queryLength);
+        CRY.outputInformationToFile(inf,queryMode);
     }
     else if (B==128)
     {
@@ -179,6 +182,8 @@ int main(int argc, char* argv[]) {
             c = CRY.outPanelLongMatchQuery(queryLength, outputFile);
             std::cout << "面板外查询完成: " << c << "\n";
         }
+        string inf = panelFile +""+"_b"+ to_string(B)+"_f"+ to_string(F)+"_l"+ to_string(queryLength);
+        CRY.outputInformationToFile(inf,queryMode);
     }
     return 0;
 }

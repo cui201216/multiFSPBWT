@@ -68,11 +68,9 @@ struct multiFSPBWT {
     vector<vector<uint32_t> > fuzzyX; // FMN/B bits
     vector<vector<int> > array; // 32MN/B bits
     vector<vector<int> > divergence; // 32MN/B bits
-    //vector<vector<vector<int>>> u; //	32MN2^F/B bits
 
      vector<vector<bool>> panelMultiSyllable;
     vector<vector<bool>> queryMultiSyllable;
-    // std::vector<Uint4Array> temp_syllables; // M，新增声明
     int *u;
 
     int Q = 0;
@@ -162,7 +160,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
         std::cerr << "无效的M: " << M << std::endl;
         return 3;
     }
-    std::cerr << "M = " << M << std::endl;
+    //std::cerr << "M = " << M << std::endl;
 
     // Step 2: 设置IDs
     IDs.resize(M);
@@ -184,7 +182,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
         return 4;
     }
     n = (N + B - 1) / B;
-    std::cerr << "N = " << N << ", n = " << n << ", B = " << B << std::endl;
+    //std::cerr << "N = " << N << ", n = " << n << ", B = " << B << std::endl;
 
     // Step 4: 初始化数据结构
     try {
@@ -1689,7 +1687,11 @@ void multiFSPBWT<Syllable>::outputInformationToFile(const std::string &fileName,
         << std::endl;
             outputFile << "MatchLen: " << matchLen
                     << std::endl;
-
+            // 新增：输出面板位点计数信息
+            outputFile << "Panel Site Counts:" << std::endl;
+            for (int i = 0; i < 10; i++) {
+                outputFile << "Site " << i << ": " << panelCount[i] << std::endl;
+            }
             std::cout << "Information has been written to " << fileName
                     << std::endl;
         } else if (mode == "out") {
@@ -1724,6 +1726,18 @@ void multiFSPBWT<Syllable>::outputInformationToFile(const std::string &fileName,
 << std::endl;
             outputFile << "MatchLen: " << matchLen
                     << std::endl;
+            // 新增：输出面板和查询位点计数信息
+            outputFile << "Panel Site Counts:" << std::endl;
+            for (int i = 0; i < 10; i++) {
+                outputFile << "Site " << i << ": " << panelCount[i] << std::endl;
+            }
+            outputFile << std::endl;
+
+            outputFile << "Query Site Counts:" << std::endl;
+            for (int i = 0; i < 10; i++) {
+                outputFile << "Site " << i << ": " << queryCount[i] << std::endl;
+            }
+            outputFile << std::endl;
             outputFile.close();
             std::cout << "Information has been written to " << fileName
                     << std::endl;
