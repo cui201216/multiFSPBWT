@@ -188,7 +188,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
     try {
         X.resize(M, std::vector<Syllable>(n));
         panelMultiInfo.resize(M, std::vector<std::pair<unsigned int, uint8_t>>(n, std::make_pair(-1, 0)));
-        panelMultiValues.reserve(M*n*0.05); // 预分配，基于统计的1,668,657
+        //panelMultiValues.reserve(M*n*0.01);
         array.resize(n + 1, std::vector<int>(M));
         std::iota(array[0].begin(), array[0].end(), 0);
         divergence.resize(n + 1, std::vector<int>(M, 0));
@@ -318,7 +318,7 @@ int multiFSPBWT<Syllable>::readMacsPanel(string panel_file) {
     end = clock();
     readPanelTime = ((double)(end - start)) / CLOCKS_PER_SEC;
     std::cerr << "readPanelTime = " << readPanelTime << " 秒, 多字符位点数 = " << panelMultiValues.size() << std::endl;
-
+    panelMultiValues.shrink_to_fit();
     return 0;
 }
 
@@ -387,7 +387,7 @@ int multiFSPBWT<Syllable>::readMacsQuery(string query_file) {
     try {
         Z.resize(Q, std::vector<Syllable>(n));
         queryMultiInfo.resize(Q, std::vector<std::pair<unsigned int, uint8_t>>(n, std::make_pair(-1, 0)));
-        queryMultiValues.reserve(Q*n*0.05);
+        //queryMultiValues.reserve(Q*n*0.01);
     } catch (const std::bad_alloc& e) {
         std::cerr << "内存分配失败: " << e.what() << std::endl;
         return -1;
@@ -396,7 +396,7 @@ int multiFSPBWT<Syllable>::readMacsQuery(string query_file) {
     // Step 5: 处理SITE行
     in.clear();
     in.seekg(0);
-    std::vector<Syllable> Z_(M, 0);
+    std::vector<Syllable> Z_(Q, 0);
     std::vector<std::vector<std::pair<uint8_t, uint8_t>>> syllableMultis(Q); // 临时存储多字符位点
 
     int K = 0, k = 0;
@@ -431,7 +431,7 @@ int multiFSPBWT<Syllable>::readMacsQuery(string query_file) {
                     queryMultiInfo[i][k] = std::make_pair(-1, 0);
                 }
             }
-            Z_.assign(M, 0); // 重置X_
+            Z_.assign(Q, 0); // 重置X_
         }
 
         std::stringstream ss(line);
@@ -502,7 +502,7 @@ int multiFSPBWT<Syllable>::readMacsQuery(string query_file) {
         std::cerr << "处理了 " << K << " 个位点，预期 " << N << std::endl;
         return 10;
     }
-
+    queryMultiValues.shrink_to_fit();
     end = clock();
     readQueryTime = ((double)(end - start)) / CLOCKS_PER_SEC;
     std::cerr << "readPanelTime = " << readPanelTime << " 秒, 多字符位点数 = " << panelMultiValues.size() << std::endl;
